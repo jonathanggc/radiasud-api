@@ -9,7 +9,7 @@ app.use(bodyParser.json());
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
 
-// 📤 Écriture dans Airtable
+// 📤 Route /write : envoie des données dans Airtable
 app.post('/write', async (req, res) => {
   const { table, data } = req.body;
 
@@ -34,23 +34,32 @@ app.post('/write', async (req, res) => {
   }
 });
 
-// 📥 Lecture depuis Airtable avec filtre simple
+// 📥 Route /read : lit les données Airtable avec ou sans filtre
 app.post('/read', async (req, res) => {
-  const { table, filter } = req.body;
+  let { table, filter } = req.body;
 
-  if (!table || !filter) {
-    return res.status(400).json({ error: 'Champs "table" et "filter" requis.' });
+  if (!table) {
+    return res.status(400).json({ error: 'Le champ "table" est requis.' });
   }
 
   try {
-    // Transforme le premier filtre en formule Airtable (FIND)
-    const [field, value] = Object.entries(filter)[0];
-    const filterFormula = `FIND("${value}", {${field}})`;
+    const params = {};
+
+    // 🧠 Gérer le filtre facultatif
+    if (filter && Object.keys(filter).length > 0) {
+      if (typeof filter === 'string') {
+        try {
+          filter = JSON.parse(filter);
+        } catch (err) {
+          return res.status(400).json({ error: 'Filtre JSON invalide.' });
+        }
+      }
+      const [field, value] = Object.entries(filter)[0];
+      params.filterByFormula = `FIND("${value}", {${field}})`;
+    }
 
     const response = await axios.get(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${table}`, {
-      params: {
-        filterByFormula: filterFormula
-      },
+      params,
       headers: {
         Authorization: `Bearer ${AIRTABLE_TOKEN}`
       }
@@ -62,7 +71,7 @@ app.post('/read', async (req, res) => {
   }
 });
 
-// 🆗 Test simple GET /
+// ✅ Route GET de test
 app.get('/', (req, res) => {
   res.send('API Airtable Radiasud - OK');
 });
@@ -71,3 +80,4 @@ const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Serveur démarré sur le port ${port}`);
 });
+
