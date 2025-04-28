@@ -45,31 +45,43 @@ app.post('/read', async (req, res) => {
   try {
     const params = {};
 
-    // 🧠 Gérer le filtre facultatif
-    if (filter && Object.keys(filter).length > 0) {
-      if (typeof filter === 'string') {
-        try {
-          filter = JSON.parse(filter);
-        } catch (err) {
-          return res.status(400).json({ error: 'Filtre JSON invalide.' });
+    if (filter && typeof filter === 'object') {
+      let formulaParts = [];
+
+      for (let field in filter) {
+        const value = filter[field];
+
+        if (typeof value === 'object' && value.between) {
+          // Gestion des dates : { DateIntervention: { between: [date1, date2] } }
+          const [start, end] = value.between;
+          formulaParts.push(`AND(IS_AFTER({${field}}, "${start}"), IS_BEFORE({${field}}, "${end}"))`);
+        } else {
+          // Gestion classique : FIND
+          formulaParts.push(`FIND("${value}", {${field}})`);
         }
       }
-      const [field, value] = Object.entries(filter)[0];
-      params.filterByFormula = `FIND("${value}", {${field}})`;
+
+      if (formulaParts.length > 0) {
+        params.filterByFormula = `AND(${formulaParts.join(',')})`;
+      }
     }
 
-    const response = await axios.get(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${table}`, {
-      params,
-      headers: {
-        Authorization: `Bearer ${AIRTABLE_TOKEN}`
+    const response = await axios.get(
+      `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${table}`,
+      {
+        params,
+        headers: {
+          Authorization: `Bearer ${AIRTABLE_TOKEN}`
+        }
       }
-    });
+    );
 
     res.json({ records: response.data.records });
   } catch (err) {
     res.status(500).json({ error: err.message, details: err.response?.data });
   }
 });
+
 
 // ✅ Route GET de test
 app.get('/', (req, res) => {
