@@ -9,7 +9,7 @@ app.use(bodyParser.json());
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
 
-// 📤 Route /write : envoie des données dans Airtable
+// 📤 Route /write : envoie des données dans Airtable (on NE TOUCHE PAS)
 app.post('/write', async (req, res) => {
   const { table, data } = req.body;
 
@@ -34,9 +34,9 @@ app.post('/write', async (req, res) => {
   }
 });
 
-// 📥 Route /read : lit les données Airtable avec ou sans filtre
-app.post('/read', async (req, res) => {
-  let { table, filter } = req.body;
+// 📥 Nouvelle route /search : lit les données Airtable avec filtres
+app.post('/search', async (req, res) => {
+  const { table, filters } = req.body;
 
   if (!table) {
     return res.status(400).json({ error: 'Le champ "table" est requis.' });
@@ -45,23 +45,23 @@ app.post('/read', async (req, res) => {
   try {
     const params = {};
 
-    if (filter && typeof filter === 'object') {
+    if (filters && typeof filters === 'object') {
       let formulaParts = [];
 
-      for (let field in filter) {
-        const value = filter[field];
+      for (const field in filters) {
+        const value = filters[field];
 
         if (typeof value === 'object' && value.between) {
-          // Gestion des dates : { DateIntervention: { between: [date1, date2] } }
           const [start, end] = value.between;
           formulaParts.push(`AND(IS_AFTER({${field}}, "${start}"), IS_BEFORE({${field}}, "${end}"))`);
-        } else {
-          // Gestion classique : FIND
+        } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
           formulaParts.push(`FIND("${value}", {${field}})`);
         }
       }
 
-      if (formulaParts.length > 0) {
+      if (formulaParts.length === 1) {
+        params.filterByFormula = formulaParts[0];
+      } else if (formulaParts.length > 1) {
         params.filterByFormula = `AND(${formulaParts.join(',')})`;
       }
     }
@@ -82,8 +82,7 @@ app.post('/read', async (req, res) => {
   }
 });
 
-
-// ✅ Route GET de test
+// ✅ Route de test
 app.get('/', (req, res) => {
   res.send('API Airtable Radiasud - OK');
 });
@@ -92,4 +91,3 @@ const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Serveur démarré sur le port ${port}`);
 });
-
