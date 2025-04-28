@@ -36,7 +36,7 @@ app.post('/write', async (req, res) => {
 
 // 📥 Nouvelle route /search : lit les données Airtable avec filtres
 app.post('/search', async (req, res) => {
-  const { table, filters } = req.body;
+  const { table, filters: filter } = req.body;
 
   if (!table) {
     return res.status(400).json({ error: 'Le champ "table" est requis.' });
