@@ -9,7 +9,7 @@ app.use(bodyParser.json());
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
 
-// 📤 Route /write : envoie des données dans Airtable (on NE TOUCHE PAS)
+// 📤 Route /write (on ne touche pas)
 app.post('/write', async (req, res) => {
   const { table, data } = req.body;
 
@@ -34,9 +34,9 @@ app.post('/write', async (req, res) => {
   }
 });
 
-// 📥 Nouvelle route /search : lit les données Airtable avec filtres
-app.post('/search', async (req, res) => {
-  const { table, filters: filter } = req.body;
+// 📥 Correction route /search en GET
+app.get('/search', async (req, res) => {
+  const { table, filterByFormula, sort, maxRecords } = req.query;
 
   if (!table) {
     return res.status(400).json({ error: 'Le champ "table" est requis.' });
@@ -45,25 +45,14 @@ app.post('/search', async (req, res) => {
   try {
     const params = {};
 
-    if (filters && typeof filters === 'object') {
-      let formulaParts = [];
-
-      for (const field in filters) {
-        const value = filters[field];
-
-        if (typeof value === 'object' && value.between) {
-          const [start, end] = value.between;
-          formulaParts.push(`AND(IS_AFTER({${field}}, "${start}"), IS_BEFORE({${field}}, "${end}"))`);
-        } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-          formulaParts.push(`FIND("${value}", {${field}})`);
-        }
-      }
-
-      if (formulaParts.length === 1) {
-        params.filterByFormula = formulaParts[0];
-      } else if (formulaParts.length > 1) {
-        params.filterByFormula = `AND(${formulaParts.join(',')})`;
-      }
+    if (filterByFormula) {
+      params.filterByFormula = filterByFormula;
+    }
+    if (sort) {
+      params.sort = [{ field: sort, direction: 'asc' }];
+    }
+    if (maxRecords) {
+      params.maxRecords = parseInt(maxRecords, 10);
     }
 
     const response = await axios.get(
