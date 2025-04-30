@@ -9,18 +9,25 @@ app.use(bodyParser.json());
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
 
-// 📤 Route /write (on ne touche pas)
+// 📤 Route /write (modifiée pour accepter data OU records)
 app.post('/write', async (req, res) => {
-  const { table, data } = req.body;
+  const { table, data, records } = req.body;
 
-  if (!table || !data) {
-    return res.status(400).json({ error: "Champs 'table' et 'data' requis." });
+  if (!table || (!data && !records)) {
+    return res.status(400).json({ error: "Champs 'table' et soit 'data' soit 'records' requis." });
   }
+
+  const payload = records
+    ? { records, typecast: true }
+    : {
+        records: [{ fields: data }],
+        typecast: true
+      };
 
   try {
     const response = await axios.post(
       `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${table}`,
-      { fields: data },
+      payload,
       {
         headers: {
           Authorization: `Bearer ${AIRTABLE_TOKEN}`,
@@ -28,7 +35,11 @@ app.post('/write', async (req, res) => {
         },
       }
     );
-    res.json({ status: 'ok', recordId: response.data.id });
+
+    res.json({
+      status: 'ok',
+      recordIds: response.data.records.map(r => r.id)
+    });
   } catch (err) {
     res.status(500).json({ error: err.message, details: err.response?.data });
   }
